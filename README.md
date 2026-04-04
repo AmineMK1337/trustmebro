@@ -1,10 +1,10 @@
-# Credibility Backend - Website Analysis Service
+# Credibility Backend - Website Analysis Library
 
-A Python Flask backend service that analyzes website credibility using LLM-powered content analysis, domain age metrics, traffic rankings, and metadata extraction.
+A Python backend library that analyzes website credibility using LLM-powered content analysis, domain age metrics, traffic rankings, and metadata extraction.
 
 ## Overview
 
-This backend service evaluates website trustworthiness by:
+This backend library evaluates website trustworthiness by:
 - Extracting page content and screenshots via Selenium
 - Analyzing content bias, sentiment, and credibility using Google Gemini AI
 - Checking domain age via WHOIS/RDAP
@@ -16,24 +16,22 @@ This backend service evaluates website trustworthiness by:
 
 - **Python 3.12+** (verify with `python --version`)
 - **Poetry** (Python package manager)
-- **Google Gemini API Key** (for live analysis)
+- **Google Gemini API Key** (for LLM analysis)
 - **Chrome/Chromium browser** (for Selenium)
 
 ## Installation
 
-### 1. Clone or Copy Files
+### 1. Files Required
 
 Ensure you have these files in your project directory:
 ```
 credibility/
 ├── api/
-│   ├── app.py
-│   ├── metrics.py
-│   └── routes.py
-├── .env
-├── pyproject.toml
-├── poetry.lock
-└── test_routes.py
+│   └── metrics.py          # Core analysis module
+├── .env                    # Environment variables
+├── pyproject.toml          # Poetry configuration
+├── poetry.lock             # Locked dependencies
+└── test_urls.py            # URL testing script
 ```
 
 ### 2. Install Dependencies
@@ -43,14 +41,14 @@ credibility/
 python -m poetry install
 ```
 
-If Poetry is not recognized, ensure it's installed:
+If Poetry is not found:
 ```bash
 python -m pip install poetry
 ```
 
 ### 3. Set Environment Variables
 
-Create or edit `.env` file in the project root:
+Create or edit `.env` file in project root:
 
 ```env
 # Required: Google Gemini API Key
@@ -65,318 +63,117 @@ To get a Gemini API key:
 2. Create a new API key
 3. Copy and paste into `.env`
 
-## Running the Backend
+## Quick Start - Testing URLs
 
-### Start the Flask Server
+### Test Without LLM (Fast, No Quota Used)
 
-```bash
-# Using Poetry
-python -m poetry run flask --app api/app --debug run --port=8080
-
-# Or activate venv first, then run
-.\.venv\Scripts\Activate.ps1  # PowerShell on Windows
-poetry run flask --app api/app --debug run --port=8080
-```
-
-The server will start at `http://localhost:8080`
-
-## Testing Websites
-
-### 1. Quick Health Check
+Test core features: domain extraction, Tranco ranking, domain age, metadata scraping.
 
 ```bash
-curl http://localhost:8080/health
-```
+# Test default URLs
+python -m poetry run python test_urls.py
 
-Response:
-```json
-{"status": "ok"}
-```
+# Test specific URL
+python -m poetry run python test_urls.py "https://www.wikipedia.org"
 
-### 2. Check LLM Connectivity
-
-```bash
-curl http://localhost:8080/llm-health
-```
-
-Response (live mode):
-```json
-{
-  "connected": true,
-  "mode": "live",
-  "model": "gemini-2.5-flash",
-  "status_code": 200,
-  "latency_ms": 1234
-}
-```
-
-### 3. Analyze a Website
-
-**Basic Request:**
-```bash
-curl "http://localhost:8080/analyze?url=https://www.goal.com"
-```
-
-**Response Fields:**
-- `tranco_rank` - Global traffic ranking (lower is more popular)
-- `analysis_confidence` - Confidence percentage (0-100%) based on available data
-- `full_report` - Comprehensive multi-section analysis report with all metrics
-
-### 4. Run Test Suite
-
-```bash
-# Run all endpoints smoke tests
-python -m poetry run python test_routes.py
-```
-
-This tests:
-- `/health` endpoint
-- `/llm-health` endpoint (Gemini API connectivity)
-- `/analyze` endpoint with a sample URL
-
-## Testing the Backend
-
-### Quick Terminal Testing
-
-Test all endpoints directly from your terminal without writing code:
-
-#### 1. Health Check
-```bash
-# Test if backend is running
-curl http://localhost:8080/health
-```
-**Expected:**
-```json
-{"status": "ok"}
-```
-
-#### 2. LLM Connectivity
-```bash
-# Verify Gemini API is reachable
-curl http://localhost:8080/llm-health
-```
-**Expected:**
-```json
-{"connected": true, "mode": "live", "status_code": 200, "latency_ms": 1234}
-```
-
-#### 3. Analyze a Website (Basic)
-```bash
-# Analyze a live website - replace URL with any website
-curl "http://localhost:8080/analyze?url=https://www.goal.com/en/news/sample-article"
-```
-
-#### 4. Analyze Multiple Websites (Loop)
-
-**PowerShell:**
-```powershell
-$urls = @(
-  "https://www.goal.com",
-  "https://www.bbc.com",
-  "https://www.wikipedia.org"
-)
-
-foreach ($url in $urls) {
-  Write-Host "Testing: $url"
-  $uri = "http://localhost:8080/analyze?url=$url"
-  $response = Invoke-WebRequest -Uri $uri -UseBasicParsing
-  $json = $response.Content | ConvertFrom-Json
-  Write-Host "  Tranco Rank: $($json.tranco_rank)"
-  Write-Host "  Confidence: $($json.analysis_confidence)%"
-  Write-Host ""
-}
-```
-
-**Bash/Linux:**
-```bash
 # Test multiple URLs
-for url in "https://www.goal.com" "https://www.bbc.com" "https://www.wikipedia.org"; do
-  echo "Testing: $url"
-  curl -s -G http://localhost:8080/analyze --data-urlencode "url=$url" | \
-    python -m json.tool | grep -E "tranco_rank|analysis_confidence"
-  echo ""
-done
+python -m poetry run python test_urls.py "https://www.wikipedia.org" "https://www.bbc.com" "https://www.goal.com"
 ```
 
-#### 5. Get Full Report Only
+**Output includes:**
+- Domain name
+- Tranco traffic rank
+- Domain age (years)
+- Analysis confidence %
+- HTML/screenshot lengths
+- Metadata (author, date found)
 
-**PowerShell:**
-```powershell
-$url = "https://www.goal.com/en/news/article"
-$response = curl -s "http://localhost:8080/analyze?url=$url" | ConvertFrom-Json
-Write-Host $response.full_report
-```
+### Test With LLM (Full Analysis)
 
-**Bash/Linux:**
-```bash
-url="https://www.goal.com/en/news/article"
-curl -s "http://localhost:8080/analyze?url=$url" | python -c "import sys, json; print(json.load(sys.stdin)['full_report'])"
-```
-
-#### 6. Extract Specific Fields
-
-**Get Tranco Rank:**
-```bash
-# Windows PowerShell
-curl http://localhost:8080/analyze?url=https://www.goal.com | ConvertFrom-Json | Select-Object -ExpandProperty tranco_rank
-
-# Bash/Linux
-curl -s "http://localhost:8080/analyze?url=https://www.goal.com" | python -c "import sys, json; print(json.load(sys.stdin)['tranco_rank'])"
-```
-
-**Get Confidence Score:**
-```bash
-# Windows PowerShell
-curl http://localhost:8080/analyze?url=https://www.goal.com | ConvertFrom-Json | Select-Object -ExpandProperty analysis_confidence
-
-# Bash/Linux
-curl -s "http://localhost:8080/analyze?url=https://www.goal.com" | python -c "import sys, json; print(json.load(sys.stdin)['analysis_confidence'])"
-```
-
-### Comprehensive Testing Methods
-
-#### Step 1: Run Automated Tests
-```bash
-# Run smoke tests for all endpoints
-python -m poetry run python test_routes.py
-```
-
-This tests:
-- `/health` - Basic connectivity
-- `/llm-health` - Gemini API reach
-- `/analyze` - Full analysis pipeline
-
-#### Step 2: Test in Python REPL
+Includes Gemini AI bias/sentiment/credibility analysis (requires API quota).
 
 ```bash
-# Start interactive Python
-python -m poetry run python
+# Test with LLM enabled
+python -m poetry run python test_urls.py --with-llm "https://www.wikipedia.org"
+
+# Multiple URLs with LLM
+python -m poetry run python test_urls.py --with-llm "https://www.wikipedia.org" "https://www.goal.com"
 ```
 
-Then paste this code:
+**LLM Output includes:**
+- Credibility score (0-100)
+- Content credibility assessment
+- Bias detection (true/false)
+- Sentiment analysis (positive/neutral/negative)
+- Publisher reputation
+- Full multi-section report
+
+## Python Usage
+
+Import and use the core functions directly:
+
 ```python
 import sys
 sys.path.insert(0, 'api')
-from app import app
+import metrics
 
-client = app.test_client()
+# Extract domain from URL
+domain = metrics.get_domain('https://www.wikipedia.org')
+print(f"Domain: {domain}")  # Output: wikipedia.org
 
-# Test health
-print("=" * 50)
-print("Testing /health")
-r = client.get('/health')
-print(f"Status: {r.status_code}")
-print(f"Response: {r.get_json()}\n")
+# Get Tranco rank
+rank = metrics.get_tranco_rank(domain)
+print(f"Tranco Rank: {rank}")  # Output: 28 (lower = more popular)
 
-# Test LLM health
-print("=" * 50)
-print("Testing /llm-health")
-r = client.get('/llm-health')
-print(f"Status: {r.status_code}")
-data = r.get_json()
-print(f"Connected: {data.get('connected')}")
-print(f"Latency: {data.get('latency_ms')}ms\n")
+# Get domain age
+age = metrics.get_domain_age(domain)
+print(f"Domain Age: {age} years")  # Output: 25 years
 
-# Test analyze
-print("=" * 50)
-print("Testing /analyze")
-url = 'https://www.goal.com/en/news/article'
-r = client.get('/analyze', query_string={'url': url})
-print(f"Status: {r.status_code}")
-data = r.get_json()
-print(f"Tranco Rank: {data.get('tranco_rank')}")
-print(f"Confidence: {data.get('analysis_confidence')}%")
-print(f"Report (first 500 chars): {data.get('full_report', '')[:500]}...")
+# Get page HTML and screenshot
+html, screenshot_b64 = metrics.get_selenium_data('https://www.wikipedia.org')
+print(f"HTML length: {len(html)} chars")
+print(f"Screenshot: {len(screenshot_b64)} chars (base64 PNG)")
+
+# Extract metadata (author, date)
+metadata = metrics.get_metadata(html)
+print(f"Author: {metadata.get('author')}")
+print(f"Date: {metadata.get('date')}")
+
+# Calculate analysis confidence
+confidence = metrics.calculate_analysis_confidence(
+    domain_age=age,
+    tranco_rank=rank,
+    metadata=metadata,
+    credibility_score=None
+)
+print(f"Analysis Confidence: {confidence}%")
+
+# Get Gemini LLM analysis (requires API key and quota)
+gemini_data = metrics.get_gemini_data(html, screenshot_b64, domain)
+print(f"Bias: {gemini_data.get('bias')}")
+print(f"Content Credibility: {gemini_data.get('content_credibility')}")
 ```
 
-#### Step 3: One-Liner Tests
+## Core Functions Reference
 
-**Check if backend is running:**
-```bash
-curl http://localhost:8080/health && echo "Backend is UP" || echo "Backend is DOWN"
-```
+### Domain & Ranking
+- `get_domain(url)` → Returns domain name
+- `get_tranco_rank(domain)` → Returns global traffic rank (1-1M+)
+- `get_domain_age(domain)` → Returns years since registration
 
-**Get all three fields from /analyze:**
-```bash
-curl -s "http://localhost:8080/analyze?url=https://www.goal.com" | python -m json.tool
-```
+### Scraping & Metadata
+- `get_selenium_data(url)` → Returns (html, screenshot_base64)
+- `get_metadata(html)` → Returns {"author": str, "date": str}
 
-**Format analyze response as table:**
-```bash
-curl -s "http://localhost:8080/analyze?url=https://www.goal.com" | python -c "
-import sys, json
-d = json.load(sys.stdin)
-print(f'Tranco Rank: {d[\"tranco_rank\"]}')
-print(f'Confidence: {d[\"analysis_confidence\"]}%')
-print(f'Report: {d[\"full_report\"][:200]}...')
-"
-```
+### Analysis
+- `get_gemini_data(html, screenshot, domain)` → LLM analysis object
+  - Returns: bias, sentiment, content_credibility, publisher_reputation, justifications
+- `get_gemini_human_report(html, domain, gemini_data)` → Readable text summary
+- `get_gemini_full_report(...)` → Multi-section comprehensive report
+- `calculate_credibility_score(domain_age, tranco_rank, ai_data, metadata)` → 0-100 score
+- `calculate_analysis_confidence(domain_age, tranco_rank, metadata, credibility_score)` → 0-100%
 
-## API Endpoints
-
-### `GET /health`
-Simple health check.
-- **Response:** `{"status": "ok"}`
-
-### `GET /llm-health`
-Check Gemini API connectivity.
-- **Query Parameters:** 
-  - `timeout=15` (seconds, optional)
-- **Response:** Connection status and latency
-
-### `GET /analyze`
-Perform full website credibility analysis.
-- **Query Parameters:**
-  - `url` (required) - Full website URL to analyze
-  - Example: `/analyze?url=https://example.com/article`
-- **Response:** 
-  - `tranco_rank` - Traffic ranking
-  - `analysis_confidence` - Confidence percentage (0-100%)
-  - `full_report` - Comprehensive multi-section analysis
-
-## Example Usage
-
-### Python
-```python
-import requests
-
-url = "https://www.goal.com/en/news/some-article"
-response = requests.get(f"http://localhost:8080/analyze?url={url}")
-data = response.json()
-
-print(f"Tranco Rank: {data['tranco_rank']}")
-print(f"Analysis Confidence: {data['analysis_confidence']}%")
-print(f"\nFull Report:\n{data['full_report']}")
-```
-
-### JavaScript/Fetch
-```javascript
-const url = "https://www.goal.com/en/news/some-article";
-const response = await fetch(`http://localhost:8080/analyze?url=${encodeURIComponent(url)}`);
-const data = await response.json();
-
-console.log(`Tranco Rank: ${data.tranco_rank}`);
-console.log(`Analysis Confidence: ${data.analysis_confidence}%`);
-console.log(data.full_report);
-```
-
-### cURL
-```bash
-curl -G http://localhost:8080/analyze \
-  --data-urlencode "url=https://www.goal.com/en/news/some-article"
-```
-
-## Backend Response Example
-
-```json
-{
-  "tranco_rank": 4521,
-  "analysis_confidence": 75,
-  "full_report": "[DOMAIN SIGNALS]\nDomain Age: 8 years\nTraffic Ranking: Top 5000 globally\n\n[ARTICLE METADATA]\nAuthor: John Doe\nPublish Date: 2024-03-15\n\n[CONTENT ANALYSIS]\n- Content Credibility: High\n- Bias Detected: False\n- Sentiment: Neutral\n... (continues with comprehensive analysis)"
-}
-```
-
-## Understanding the Response
+## Understanding Results
 
 ### Tranco Rank
 The global traffic ranking of the domain:
@@ -393,13 +190,13 @@ How confident the analysis is based on available data signals:
 - **50-79%:** Medium confidence (most signals available)
 - **Below 50%:** Low confidence (limited data available)
 
-### Full Report
-Multi-section comprehensive analysis including:
-- **DOMAIN SIGNALS:** Age, traffic rank, registration details
-- **ARTICLE METADATA:** Author, publish date, last modified date
-- **CONTENT ANALYSIS:** Credibility assessment, bias detection, sentiment analysis, publisher reputation
-- **CREDIBILITY SCORING:** Detailed scoring breakdown
-- **EXPERT SUMMARY:** AI-generated human-readable summary
+### Credibility Score (0-100)
+With LLM analysis:
+- **80-100:** Highly credible source
+- **60-79:** Generally credible
+- **40-59:** Mixed credibility signals
+- **20-39:** Low credibility
+- **0-19:** Likely fake/unreliable
 
 ## Troubleshooting
 
@@ -408,7 +205,7 @@ Multi-section comprehensive analysis including:
 **Solution:** Use `python -m poetry` instead:
 ```bash
 python -m poetry install
-python -m poetry run flask --app api/app run
+python -m poetry run python test_urls.py
 ```
 
 ### Issue: "No Chrome/Chromium found"
@@ -422,6 +219,14 @@ python -m poetry run flask --app api/app run
 2. Add valid `GEMINI_API_KEY` to `.env`
 3. Get a key from [Google AI Studio](https://aistudio.google.com/app/apikey)
 
+### Issue: "Quota exceeded" (429 error)
+
+**Solution:** 
+1. Gemini free-tier limits 20 requests/day per model
+2. Wait 24 hours for quota reset, OR
+3. Upgrade to paid plan in [Google AI Console](https://aistudio.google.com), OR
+4. Create new Google Cloud project for fresh quota
+
 ### Issue: SSL Certificate Verification Failed
 
 **Solution:** This is expected for some websites. The backend uses requests with browser-like headers to handle this.
@@ -431,7 +236,7 @@ python -m poetry run flask --app api/app run
 **Solution:** 
 1. Check your GEMINI_API_KEY is valid
 2. Verify internet connectivity to Gemini API
-3. Check if API quota is exceeded
+3. Check if API quota is exceeded (use `python -m poetry run python test_urls.py` to test without LLM)
 4. Try a different URL if the current one is blocked
 
 ## Performance Notes
@@ -452,11 +257,3 @@ python -m poetry run flask --app api/app run
 ## License
 
 This project is part of the Credibility research tool.
-
-## Support
-
-For issues or questions about the backend service, check:
-1. `.env` configuration
-2. API key validity
-3. Browser/Chrome installation
-4. Network connectivity to Gemini API
