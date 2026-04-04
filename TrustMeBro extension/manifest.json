@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "TrustMeBro - Media Verifier",
+  "version": "1.0",
+  "description": "AI-powered detection for manipulated media.",
+  "permissions": ["activeTab", "storage"],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "css": ["content.css"],
+      "js": ["content.js"]
+    }
+  ],
+  "icons": {
+    "128": "icon.png"
+  }
+}
