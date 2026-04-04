@@ -10,11 +10,13 @@ from urllib.parse import urlparse
 import json
 import os
 import time
+from dotenv import load_dotenv
+
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env"))
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
-GEMINI_TEST_MODE = os.getenv("GEMINI_TEST_MODE", "false").lower() in {"1", "true", "yes", "on"}
 
 t = Tranco(cache=True, cache_dir=".tranco")
 chrome_options = Options()
@@ -24,7 +26,9 @@ chrome_options.add_argument("--disable-blink-features=AutomationControlled")  # 
 chrome_options.add_argument("--disable-gpu")  # Disable GPU hardware acceleration
 chrome_options.add_argument("--no-sandbox")  # Bypass OS security model
 chrome_options.add_argument("--disable-dev-shm-usage")  # Overcome limited resource problems
-chrome_options.add_argument("--remote-debugging-port=9222")  # Enable remote debugging
+chrome_options.add_argument("--log-level=3")
+chrome_options.add_argument("--disable-logging")
+chrome_options.add_argument("--silent")
 
 # Make the browser appear more like a real user
 chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
@@ -128,25 +132,6 @@ def get_tranco_rank(domain):
     return t.list().rank(domain)
 
 def get_selenium_data(url):
-    if GEMINI_TEST_MODE:
-        # In test mode, use requests to get HTML instead of Selenium
-        try:
-            response = requests.get(
-                url,
-                timeout=10,
-                headers={
-                    "User-Agent": user_agent,
-                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                },
-            )
-            response.raise_for_status()
-            html = response.text
-            # Create a minimal test screenshot (1x1 PNG)
-            screenshot = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
-            return html, screenshot
-        except requests.exceptions.RequestException as e:
-            raise RuntimeError(f"Failed to fetch URL {url}: {str(e)}")
-
     driver = _get_driver()
     driver.get(url)
     html = driver.page_source
@@ -246,8 +231,8 @@ def get_gemini_human_report(html, domain, gemini_data):
     payload = {
         "contents": [{"role": "user", "parts": [{"text": report_prompt}]}],
         "generationConfig": {
-            "temperature": 0.3,
-            "maxOutputTokens": 350,
+            "temperature": 0.5,
+            "maxOutputTokens": 500,
         },
     }
 
@@ -641,6 +626,88 @@ def get_gemini_full_report(domain, domain_age, tranco_rank, gemini_data, metadat
     lines.append(llm_report)
 
     return "\n".join(lines)
+
+
+def get_credibility_decision(domain_age, tranco_rank, gemini_data, credibility_score, analysis_confidence, metadata):
+    """
+    Use Gemini LLM to make a final credibility decision on the source.
+    Returns: {is_credible: bool, reasoning: str, confidence: int (0-100)}
+    """
+    if not GEMINI_API_KEY:
+        raise RuntimeError("Missing GEMINI_API_KEY or GOOGLE_API_KEY environment variable")
+
+    # Build analysis summary for LLM
+    bias_status = "Yes, biased" if gemini_data.get("bias") else "No bias detected"
+    sentiment = gemini_data.get("sentiment", 0)
+    sentiment_map = {-1: "Negative", 0: "Neutral", 1: "Positive"}
+    sentiment_str = sentiment_map.get(sentiment, "Unknown")
+    
+    credibility_levels = {0: "Low", 1: "Medium", 2: "High"}
+    content_credibility = credibility_levels.get(gemini_data.get("content_credibility", 0), "Unknown")
+    
+    reputation = "Well-known and reputable" if gemini_data.get("publisher_reputation") else "Not well-known/unclear reputation"
+    
+    analysis_summary = f"""
+Domain Information:
+- Domain Age: {domain_age if domain_age else 'Unknown'} years
+- Traffic Rank: {f'#{tranco_rank}' if tranco_rank else 'Not ranked'}
+- Author Listed: {'Yes' if metadata.get('author') else 'No'}
+- Publish Date Listed: {'Yes' if metadata.get('date') else 'No'}
+
+Content Analysis:
+- Bias Detected: {bias_status}
+- Sentiment: {sentiment_str}
+- Content Credibility: {content_credibility}
+- Publisher Reputation: {reputation}
+- Overall Credibility Score: {int(credibility_score) if credibility_score else 'N/A'}/100
+- Analysis Confidence: {analysis_confidence}%
+
+Based on all these signals, provide a final credibility assessment. Respond ONLY with valid JSON:
+{{
+  "is_credible": true/false,
+  "reasoning": "Brief explanation (1-2 sentences) of your decision",
+  "confidence": <0-100 integer indicating confidence in this decision>
+}}
+"""
+
+    payload = {
+        "contents": [
+            {
+                "parts": [
+                    {
+                        "text": f"You are a content credibility expert. Analyze the following source signals and decide if the source is credible or not.\n{analysis_summary}"
+                    }
+                ]
+            }
+        ]
+    }
+
+    try:
+        response = requests.post(
+            GEMINI_URL,
+            params={"key": GEMINI_API_KEY},
+            json=payload,
+            timeout=30,
+        )
+        response.raise_for_status()
+        response_data = response.json()
+        content = response_data["candidates"][0]["content"]["parts"][0]["text"]
+
+        # Parse JSON response
+        decision_data = _parse_llm_json_text(content)
+        if not decision_data:
+            decision_data = _normalize_gemini_output(content)
+
+        return {
+            "is_credible": decision_data.get("is_credible", False),
+            "reasoning": decision_data.get("reasoning", "Unable to determine credibility"),
+            "confidence": int(decision_data.get("confidence", 50)),
+        }
+
+    except requests.exceptions.RequestException as e:
+        if hasattr(e.response, "status_code"):
+            raise RuntimeError(f"Gemini API request failed with status {e.response.status_code}: {str(e)}")
+        raise RuntimeError(f"Gemini API request failed: {str(e)}")
 
 
 if __name__ == "__main__":
