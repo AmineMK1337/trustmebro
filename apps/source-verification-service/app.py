@@ -1,19 +1,19 @@
 import json
 import time
+import threading
 from datetime import datetime, timezone
 
-from flask import Flask, request, jsonify
+from flask import Flask, jsonify
 from flask_cors import CORS
-from confluent_kafka import Producer
+from confluent_kafka import Producer, Consumer, KafkaError
 
 from app_config import config
-from agent.source_agent import SourceAgent
+from pipeline import run_verification_pipeline
 
 app = Flask(__name__)
 CORS(app, origins=config["cors_origins"], supports_credentials=True)
 
 producer = None
-agent = SourceAgent(api_key=config["gemini_api_key"], verbose=False)
 
 
 def get_producer():
@@ -26,9 +26,54 @@ def get_producer():
     return producer
 
 
-def normalize_source(payload):
-    raw = payload.get("sourceUrl") or payload.get("sourceAccountId") or ""
-    return raw.strip().lower()
+def process_message(message: dict):
+    print(f"[{config['service_name']}] Processing verification for {message.get('postId')} (source: {message.get('source')})")
+
+    result = run_verification_pipeline(message)
+
+    print(f"[{config['service_name']}] Verification complete: {result['status']} (trust: {result['finalTrustRating']})")
+
+    p = get_producer()
+    p.produce(
+        config["output_topic"],
+        key=result["submissionId"],
+        value=json.dumps(result).encode("utf-8"),
+    )
+    p.flush()
+
+    print(f"[{config['service_name']}] Published result on {config['output_topic']}")
+
+
+def start_consumer():
+    try:
+        consumer = Consumer({
+            "bootstrap.servers": ",".join(config["kafka_brokers"]),
+            "group.id": config["consumer_group"],
+            "auto.offset.reset": "earliest",
+            "client.id": f"{config['service_name']}-consumer",
+        })
+
+        consumer.subscribe([config["input_topic"]])
+        print(f"[{config['service_name']}] Subscribed to {config['input_topic']}")
+
+        while True:
+            msg = consumer.poll(timeout=1.0)
+            if msg is None:
+                continue
+            if msg.error():
+                if msg.error().code() != KafkaError._PARTITION_EOF:
+                    print(f"[{config['service_name']}] Consumer error: {msg.error()}")
+                continue
+            try:
+                value = json.loads(msg.value().decode("utf-8"))
+                process_message(value)
+            except Exception as e:
+                print(f"[{config['service_name']}] Error processing message: {e}")
+
+    except Exception as e:
+        print(f"[{config['service_name']}] CONSUMER THREAD CRASHED: {e}")
+    finally:
+        consumer.close()
 
 
 @app.get("/health")
@@ -36,78 +81,22 @@ def health():
     return jsonify({
         "service": config["service_name"],
         "status": "ok",
+        "mode": "kafka-consumer-worker",
+        "input_topic": config["input_topic"],
+        "output_topic": config["output_topic"],
         "timestamp": time.time(),
     })
 
 
-@app.post("/verify")
-def verify():
-    payload = request.get_json() or {}
-    normalized_source = normalize_source(payload)
-
-    if not normalized_source:
-        return jsonify({"message": "sourceUrl or sourceAccountId is required"}), 400
-
-    try:
-        # Run the 3-layer source agent
-        agent_result = agent.run(
-            url=payload.get("sourceUrl"),
-            text=payload.get("narrative"),
-            metadata=payload.get("metadata"),
-        )
-
-        # Map agent risk to service status
-        status_map = {"Low": "verified", "Medium": "suspicious", "High": "unverifiable"}
-        status = status_map.get(agent_result["risk"], "suspicious")
-
-        # Invert suspicion score to trust rating (0-100 → 0.0-1.0)
-        trust_rating = round(1 - agent_result["score"] / 100, 2)
-
-        # Escalate to Kafka if not verified
-        kafka_escalated = False
-        if status != "verified":
-            verification_request = {
-                "postId": payload.get("postId") or f"post-{time.time()}",
-                "source": normalized_source,
-                "narrative": payload.get("narrative"),
-                "contentType": payload.get("contentType", "mixed"),
-                "requestedAt": datetime.now(timezone.utc).isoformat(),
-                "reason": "source-agent-escalation",
-            }
-            try:
-                p = get_producer()
-                p.produce(
-                    config["kafka_topic"],
-                    key=verification_request["postId"],
-                    value=json.dumps(verification_request).encode("utf-8"),
-                )
-                p.flush()
-                kafka_escalated = True
-            except Exception as e:
-                app.logger.warning(f"Kafka escalation failed: {e}")
-
-        return jsonify({
-            "source": normalized_source,
-            "status": status,
-            "trustRating": trust_rating,
-            "risk": agent_result["risk"],
-            "score": agent_result["score"],
-            "reasons": agent_result["reasons"],
-            "details": agent_result["details"],
-            "verificationMode": "source-agent",
-            "kafkaEscalated": kafka_escalated,
-            "topic": config["kafka_topic"] if kafka_escalated else None,
-        }), 200 if status == "verified" else 202
-
-    except Exception as e:
-        return jsonify({"message": str(e)}), 500
-
-
 if __name__ == "__main__":
+    consumer_thread = threading.Thread(target=start_consumer, daemon=True)
+    consumer_thread.start()
+    print(f"[{config['service_name']}] Kafka consumer thread started")
+
     try:
         get_producer()
-        app.logger.info(f"[{config['service_name']}] Kafka producer connected")
+        print(f"[{config['service_name']}] Kafka producer connected")
     except Exception as e:
-        app.logger.warning(f"Kafka producer connection failed: {e}")
+        print(f"[{config['service_name']}] Kafka producer connection failed: {e}")
 
     app.run(port=config["port"])
