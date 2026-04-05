@@ -6,12 +6,14 @@ def split_csv(value, fallback):
     return fallback
 
 config = {
-    "service_name": "source-verification-service",
-    "port": int(os.environ.get("PORT", 8080)),
+    "service_name": "content-verification-service",
+    "port": int(os.environ.get("PORT", 8082)),
     "cors_origins": split_csv(os.environ.get("CORS_ORIGINS"), ["http://localhost:3000"]),
     "kafka_brokers": split_csv(os.environ.get("KAFKA_BROKERS"), [
         "localhost:9094", "localhost:9095", "localhost:9096"
     ]),
-    "kafka_topic": os.environ.get("CONTENT_VERIFICATION_TOPIC", "content-verification.requested"),
+    "input_topic": os.environ.get("INPUT_TOPIC", "content-verification.requested"),
+    "output_topic": os.environ.get("OUTPUT_TOPIC", "content-verification.completed"),
+    "consumer_group": os.environ.get("CONSUMER_GROUP", "content-verification-service-group"),
     "gemini_api_key": os.environ.get("GEMINI_API_KEY", ""),
 }
