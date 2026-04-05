@@ -1,0 +1,9 @@
+packages:
+  - "apps/web-ui"
+  - "apps/extension-ui"
+  - "apps/source-verification-service"
+  - "apps/content-verification-service"
+  - "apps/kafka-service"
+  - "packages/eslint-config"
+  - "packages/kafka"
+  - "packages/typescript-config"

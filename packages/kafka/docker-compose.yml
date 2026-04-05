@@ -1,0 +1,92 @@
+services:
+  trustmebro-kafka-broker-1:
+    image: apache/kafka:latest
+    container_name: trustmebro-kafka-broker-1
+    hostname: trustmebro-kafka-broker-1
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://trustmebro-kafka-broker-1:9092,CONTROLLER://trustmebro-kafka-broker-1:9093,EXTERNAL://0.0.0.0:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://trustmebro-kafka-broker-1:9092,EXTERNAL://localhost:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@trustmebro-kafka-broker-1:9093,2@trustmebro-kafka-broker-2:9093,3@trustmebro-kafka-broker-3:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+      CLUSTER_ID: 7Dvn0OLMQo-bg4qmCmflVg
+    ports:
+      - "9094:9094"
+    networks:
+      - kafka-network
+
+  trustmebro-kafka-broker-2:
+    image: apache/kafka:latest
+    container_name: trustmebro-kafka-broker-2
+    hostname: trustmebro-kafka-broker-2
+    environment:
+      KAFKA_BROKER_ID: 2
+      KAFKA_NODE_ID: 2
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://trustmebro-kafka-broker-2:9092,CONTROLLER://trustmebro-kafka-broker-2:9093,EXTERNAL://0.0.0.0:9095
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://trustmebro-kafka-broker-2:9092,EXTERNAL://localhost:9095
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@trustmebro-kafka-broker-1:9093,2@trustmebro-kafka-broker-2:9093,3@trustmebro-kafka-broker-3:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+      CLUSTER_ID: 7Dvn0OLMQo-bg4qmCmflVg
+    ports:
+      - "9095:9095"
+    networks:
+      - kafka-network
+
+  trustmebro-kafka-broker-3:
+    image: apache/kafka:latest
+    container_name: trustmebro-kafka-broker-3
+    hostname: trustmebro-kafka-broker-3
+    environment:
+      KAFKA_BROKER_ID: 3
+      KAFKA_NODE_ID: 3
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://trustmebro-kafka-broker-3:9092,CONTROLLER://trustmebro-kafka-broker-3:9093,EXTERNAL://0.0.0.0:9096
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://trustmebro-kafka-broker-3:9092,EXTERNAL://localhost:9096
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@trustmebro-kafka-broker-1:9093,2@trustmebro-kafka-broker-2:9093,3@trustmebro-kafka-broker-3:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+      CLUSTER_ID: 7Dvn0OLMQo-bg4qmCmflVg
+    ports:
+      - "9096:9096"
+    networks:
+      - kafka-network
+
+  trustmebro-kafka-ui:
+    image: provectuslabs/kafka-ui:v0.7.2
+    container_name: trustmebro-kafka-ui
+    environment:
+      KAFKA_CLUSTERS_0_NAME: trustmebro-local-cluster
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: trustmebro-kafka-broker-1:9092,trustmebro-kafka-broker-2:9092,trustmebro-kafka-broker-3:9092
+      KAFKA_CLUSTERS_0_READONLY: false
+    ports:
+      - "8088:8080"
+    depends_on:
+      - trustmebro-kafka-broker-1
+      - trustmebro-kafka-broker-2
+      - trustmebro-kafka-broker-3
+    networks:
+      - kafka-network
+
+networks:
+  kafka-network:
+    driver: bridge
