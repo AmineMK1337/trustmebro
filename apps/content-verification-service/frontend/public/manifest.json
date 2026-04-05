@@ -1,0 +1,25 @@
+{
+  "short_name": "Trust Me Bro",
+  "name": "Trust Me Bro",
+  "icons": [
+    {
+      "src": "assets/trust-me-bro.png",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/trust-me-bro.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "assets/trust-me-bro.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#0ea5e9",
+  "background_color": "#ffffff"
+}
