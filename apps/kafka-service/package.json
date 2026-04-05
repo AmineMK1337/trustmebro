@@ -5,6 +5,7 @@
   "main": "src/index.ts",
   "scripts": {
     "dev": "tsx --env-file=.env --watch src/index.ts",
+    "start": "tsx --env-file=.env src/index.ts",
     "check-types": "tsc --noEmit"
   },
   "dependencies": {

@@ -43,5 +43,22 @@ yarn-error.log*
 # Temporary scratch files
 *.tmp
 
+# Python
+__pycache__/
+*.py[cod]
+
+# Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
 # Extension captured data
 apps/extension-ui/intercepted_posts/

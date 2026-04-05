@@ -1,0 +1,60 @@
+{
+  "family": "content-verification-service",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "arn:aws:iam::123456789012:role/trustmebro-prod-ecs-execution-role",
+  "taskRoleArn": "arn:aws:iam::123456789012:role/trustmebro-prod-content-verification-service-task-role",
+  "containerDefinitions": [
+    {
+      "name": "content-verification-service",
+      "image": "123456789012.dkr.ecr.us-east-1.amazonaws.com/content-verification-service:latest",
+      "essential": true,
+      "readonlyRootFilesystem": true,
+      "portMappings": [
+        {
+          "containerPort": 8082,
+          "hostPort": 8082,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {
+          "name": "PORT",
+          "value": "8082"
+        },
+        {
+          "name": "INPUT_TOPIC",
+          "value": "content-verification.requested"
+        },
+        {
+          "name": "OUTPUT_TOPIC",
+          "value": "content-verification.completed"
+        },
+        {
+          "name": "CONSUMER_GROUP",
+          "value": "content-verification-service-group"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "KAFKA_BROKERS",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:123456789012:secret:replace-me"
+        },
+        {
+          "name": "GEMINI_API_KEY",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:123456789012:secret:replace-me"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/trustmebro-prod/content-verification-service",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ]
+}
