@@ -1,88 +1,163 @@
 # TrustMeBro
 
-> AI-powered content verification platform addressing the trust crisis in digital media.
+TrustMeBro is a multi-service content verification platform for checking social posts across four verification layers:
 
-In today's digital age, photos, videos, and documents can be subtly altered, AI-generated, or entirely fabricated. TrustMeBro provides automated, transparent verification across three functional axes:
+- source verification
+- content verification
+- context verification
+- Kafka-backed orchestration
 
-1. **Content Authenticity** — Detect AI-generated or tampered media using forensic analysis and machine learning
-2. **Contextual Consistency** — Verify whether content is being used in a misleading context by analyzing narrative-vs-content alignment
-3. **Source Credibility** — Assess the reliability of the originating account, URL, or domain using heuristic and indexed dataset checks
+The current codebase combines Python Flask services, a Next.js app, a Node Kafka helper, and a browser extension prototype.
 
-Every verification result includes a **trust rating**, **confidence score**, **status** (verified / suspicious / unverifiable), and a **human-readable explanation** so users understand *why* the AI reached its conclusion.
+## Services
 
-## Architecture
+| Service | Runtime | Port | Role |
+|---------|---------|------|------|
+| `source-verification-service` | Python / Flask | `8080` | Public API for source credibility checks. Evaluates a source and can escalate downstream verification work to Kafka. |
+| `content-verification-service` | Python / Flask | `8082` | Private worker that consumes Kafka jobs and produces content-verification results. |
+| `context-verification-service` | Next.js | `3000` | Public web app and API for contextual consistency checks using Gemini, reverse image search, and linked-article extraction. |
+| `kafka-service` | Node / Express | `8081` | Private Kafka bootstrap and health service for required topics. |
+| `extension-ui` | Chrome extension + local Flask helper | `5000` local helper | Experimental browser extension flow for scraping posts and sending verification payloads. |
 
+## Current Architecture
+
+The app currently behaves like this:
+
+1. `context-verification-service` exposes a web UI and `/api/verify` route for contextual consistency analysis.
+2. `source-verification-service` exposes `/verify` and `/health` for source credibility checks.
+3. `source-verification-service` can publish verification requests to Kafka when a source needs deeper review.
+4. `content-verification-service` consumes Kafka messages, runs asynchronous verification, and publishes results back to Kafka.
+5. `kafka-service` ensures required Kafka topics exist and provides a simple health endpoint.
+6. `extension-ui` is a separate prototype path for scraping social content locally and sending it to a local helper backend.
+
+## Repository Layout
+
+```text
+apps/
+  source-verification-service/   Flask API for source checks
+  content-verification-service/  Flask Kafka worker for content analysis
+  context-verification-service/  Next.js app for contextual consistency
+  kafka-service/                 Node service for Kafka bootstrap/health
+  extension-ui/                  Chrome extension prototype
+
+infra/aws/                       Terraform for AWS deployment
+.github/workflows/               GitHub Actions deployment workflow
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                    CloudFront + WAF + API Gateway             │
-└────────────┬──────────────────────────────────┬──────────────┘
-             │                                  │
-    ┌────────▼─────────┐             ┌──────────▼──────────┐
-    │  Source Verify    │ ──Kafka──▶  │  Content Verify     │
-    │  Service (HTTP)   │             │  Worker (Consumer)   │
-    └────────┬─────────┘             └──────────┬──────────┘
-             │                                  │
-    ┌────────▼──────────────────────────────────▼──────────┐
-    │              Amazon MSK (Kafka)                       │
-    │  Topics: content-verification.requested               │
-    │          content-verification.completed                │
-    │          source-verification.audit                     │
-    └──────────────────────────────────────────────────────┘
-             │                                  │
-    ┌────────▼─────────┐             ┌──────────▼──────────┐
-    │  S3 + Kendra     │             │  Rekognition +       │
-    │  (Source DB)      │             │  Bedrock + SageMaker │
-    └──────────────────┘             └─────────────────────┘
-```
 
-## Active Services
+## Local Development
 
-| Service | Role | Port |
-|---------|------|------|
-| `source-verification-service` | HTTP API — checks source trust via Kendra + local credibility heuristics, escalates to Kafka | 8080 |
-| `content-verification-service` | Kafka consumer — runs the full verification pipeline (authenticity, consistency, credibility) | 8082 |
-| `kafka-service` | Bootstraps MSK topics, exposes health endpoint | 8081 |
-| `web-ui` | Static frontend with visual trust result rendering | 3000 |
-| `extension-ui` | Chrome extension (Manifest V3) popup for quick source checks | — |
+There is no single root command that correctly boots every service in the current repo, because the services use different runtimes.
 
-## Quick Start
+### 1. Start Kafka locally
+
+If you are using the local Kafka package:
 
 ```bash
-# 1. Install dependencies
-pnpm install
-
-# 2. Start local Kafka (requires Docker)
-cd packages/kafka && docker compose up -d && cd ../..
-
-# 3. Start all services
-pnpm dev
+cd packages/kafka
+docker compose up -d
+cd ../..
 ```
 
-The web UI will be available at `http://localhost:3000`. Enter a source URL to see the trust analysis.
+### 2. Run source-verification-service
 
-## Verification Output
+```bash
+cd apps/source-verification-service
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+python app.py
+```
 
-Every verification produces a structured result:
+Runs on `http://localhost:8080`.
 
-- **Trust Rating** — 0.0 to 1.0 composite score
-- **Confidence Score** — how confident the system is in its assessment
-- **Status** — `verified`, `suspicious`, or `unverifiable`
-- **Explanation** — human-readable reasoning
-- **Credibility Breakdown** — per-signal analysis with impact indicators
-- **Content Verification** (async) — tamper score, synthetic media score, narrative consistency, historical consistency
+### 3. Run content-verification-service
 
-## Target AWS Setup
+```bash
+cd apps/content-verification-service
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+python app.py
+```
 
-- `CloudFront` + `WAF` + `API Gateway HTTP API`
-- `ECS Fargate` for the microservices
-- `ECS Service Connect` for private service-to-service networking
-- `Amazon S3` for source datasets and evidence storage
-- `Amazon Kendra` for source discovery
-- `Amazon MSK` for Kafka
-- `Amazon Rekognition` + `SageMaker` for media forensics
-- `Amazon Bedrock` for narrative consistency analysis
-- `Amazon Textract` for document extraction
-- `Secrets Manager` for configuration and credentials
-- `CloudWatch` for logs, metrics, and alarms
+Runs on `http://localhost:8082`.
 
-See `opus.md` for the architecture brief and `infra/aws/README.md` for the rollout scaffold.
+### 4. Run kafka-service
+
+```bash
+pnpm install
+pnpm --filter kafka-service dev
+```
+
+Runs on `http://localhost:8081`.
+
+### 5. Run context-verification-service
+
+```bash
+cd apps/context-verification-service
+npm install
+npm run dev
+```
+
+Runs on `http://localhost:3000`.
+
+Required environment variables for the API route:
+
+- `GEMINI_API_KEY`
+- `IMGBB_API_KEY`
+- `SERPAPI_API_KEY`
+
+### 6. Optional extension flow
+
+The extension prototype can use:
+
+- `apps/extension-ui/content.js`
+- `apps/extension-ui/app.py`
+
+The local helper runs on `http://127.0.0.1:5000`.
+
+## Important API Endpoints
+
+### source-verification-service
+
+- `GET /health`
+- `POST /verify`
+
+### content-verification-service
+
+- `GET /health`
+
+### context-verification-service
+
+- `POST /api/verify`
+- `GET /` for the web app
+
+### kafka-service
+
+- `GET /health`
+
+## Docker
+
+Each deployable service now has its own Dockerfile:
+
+- [source-verification-service Dockerfile](c:/Users/user/Documents/Coding%20Projects/menacraft/apps/source-verification-service/Dockerfile)
+- [content-verification-service Dockerfile](c:/Users/user/Documents/Coding%20Projects/menacraft/apps/content-verification-service/Dockerfile)
+- [context-verification-service Dockerfile](c:/Users/user/Documents/Coding%20Projects/menacraft/apps/context-verification-service/Dockerfile)
+- [kafka-service Dockerfile](c:/Users/user/Documents/Coding%20Projects/menacraft/apps/kafka-service/Dockerfile)
+
+## AWS Deployment
+
+Terraform for AWS is under [infra/aws](c:/Users/user/Documents/Coding%20Projects/menacraft/infra/aws).
+
+At a high level, the AWS architecture is:
+
+- a VPC with public and private subnets
+- one public ALB for `source-verification-service`
+- one public ALB for `context-verification-service`
+- private ECS Fargate services for `content-verification-service` and `kafka-service`
+- one private ECR repository per service
+- Secrets Manager for runtime secrets
+- CloudWatch log groups per service
+- GitHub Actions deploying to ECS through OIDC
+
+See [infra/aws/README.md](c:/Users/user/Documents/Coding%20Projects/menacraft/infra/aws/README.md) for provisioning and rollout details.

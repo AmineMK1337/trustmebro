@@ -54,10 +54,6 @@ export type VerificationResult = {
   verifiedAt: string;
 };
 
-/* ------------------------------------------------------------------ */
-/*  Helpers                                                            */
-/* ------------------------------------------------------------------ */
-
 const clampScore = (v: number) => Math.max(0, Math.min(1, v));
 const round2 = (v: number) => parseFloat(v.toFixed(2));
 
@@ -81,16 +77,12 @@ const countSubdomains = (domain: string): number =>
 
 const hasHomoglyphs = (source: string): boolean => {
   const patterns = [
-    /[а-яА-Я]/,  // Cyrillic characters mixed with Latin
-    /[０-９]/,    // Full-width digits
-    /rn(?=\w)/,   // rn mimicking m
+    /[а-яА-Я]/,
+    /[０-９]/,
+    /rn(?=\w)/,
   ];
   return patterns.some((p) => p.test(source));
 };
-
-/* ------------------------------------------------------------------ */
-/*  Axis 1: Content Authenticity                                       */
-/* ------------------------------------------------------------------ */
 
 const analyzeContentAuthenticity = (
   req: VerificationRequest,
@@ -136,10 +128,6 @@ const analyzeContentAuthenticity = (
   return { score: round2(score), reasoning, signals };
 };
 
-/* ------------------------------------------------------------------ */
-/*  Axis 2: Contextual Consistency                                     */
-/* ------------------------------------------------------------------ */
-
 const analyzeContextualConsistency = (
   req: VerificationRequest,
 ): VerificationAxisResult => {
@@ -147,7 +135,7 @@ const analyzeContextualConsistency = (
   let score = scoring.consistencyBase;
 
   if (!req.narrative) {
-    signals.push("No narrative provided — contextual consistency cannot be fully evaluated");
+    signals.push("No narrative provided - contextual consistency cannot be fully evaluated");
     return {
       score: scoring.consistencyNoNarrative,
       reasoning:
@@ -182,10 +170,9 @@ const analyzeContextualConsistency = (
   const domain = extractDomain(req.source);
   if (isTrustedDomain(domain)) {
     score += scoring.consistencyTrustedSourceBoost;
-    signals.push("Source is a recognized publisher — narrative is more likely to match content");
+    signals.push("Source is a recognized publisher - narrative is more likely to match content");
   }
 
-  // Check for excessive caps (shouting)
   const alphaChars = req.narrative.replace(/[^A-Za-z]/g, "");
   const capsRatio = alphaChars.length > 0
     ? req.narrative.replace(/[^A-Z]/g, "").length / alphaChars.length
@@ -196,7 +183,6 @@ const analyzeContextualConsistency = (
     signals.push("Narrative uses excessive capitalization, a common indicator of sensationalist claims");
   }
 
-  // Excessive exclamation/question marks
   const punctuationCount = (req.narrative.match(/[!?]{2,}/g) || []).length;
   if (punctuationCount > 0) {
     score -= scoring.consistencyPunctuationPenalty * punctuationCount;
@@ -214,10 +200,6 @@ const analyzeContextualConsistency = (
 
   return { score: round2(score), reasoning, signals };
 };
-
-/* ------------------------------------------------------------------ */
-/*  Axis 3: Source Credibility                                         */
-/* ------------------------------------------------------------------ */
 
 const analyzeSourceCredibility = (
   req: VerificationRequest,
@@ -246,7 +228,7 @@ const analyzeSourceCredibility = (
 
   if (req.source.startsWith("@")) {
     score = Math.min(score, scoring.credibilitySocialMediaCap);
-    signals.push("Source is a social media handle — credibility depends on account history and verification status");
+    signals.push("Source is a social media handle - credibility depends on account history and verification status");
   }
 
   if (/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/.test(req.source)) {
@@ -270,10 +252,6 @@ const analyzeSourceCredibility = (
 
   return { score: round2(score), reasoning, signals };
 };
-
-/* ------------------------------------------------------------------ */
-/*  Full pipeline                                                      */
-/* ------------------------------------------------------------------ */
 
 export const runVerificationPipeline = (
   req: VerificationRequest,

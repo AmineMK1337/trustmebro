@@ -1,0 +1,44 @@
+{
+  "family": "kafka-service",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "arn:aws:iam::123456789012:role/trustmebro-prod-ecs-execution-role",
+  "taskRoleArn": "arn:aws:iam::123456789012:role/trustmebro-prod-kafka-service-task-role",
+  "containerDefinitions": [
+    {
+      "name": "kafka-service",
+      "image": "123456789012.dkr.ecr.us-east-1.amazonaws.com/kafka-service:latest",
+      "essential": true,
+      "readonlyRootFilesystem": true,
+      "portMappings": [
+        {
+          "containerPort": 8081,
+          "hostPort": 8081,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {
+          "name": "PORT",
+          "value": "8081"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "KAFKA_BROKERS",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:123456789012:secret:replace-me"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/trustmebro-prod/kafka-service",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,146 @@
+name: Deploy AWS Microservices
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/deploy-aws.yml"
+      - "apps/content-verification-service/**"
+      - "apps/context-verification-service/**"
+      - "apps/kafka-service/**"
+      - "apps/source-verification-service/**"
+      - "packages/kafka/**"
+      - "packages/typescript-config/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "turbo.json"
+      - "infra/aws/**"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  ECS_CLUSTER: ${{ vars.ECS_CLUSTER }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: source-verification-service
+            dockerfile: apps/source-verification-service/Dockerfile
+            context: apps/source-verification-service
+            task_definition: infra/aws/ecs/task-definitions/source-verification-service.json
+            container_name: source-verification-service
+          - service: content-verification-service
+            dockerfile: apps/content-verification-service/Dockerfile
+            context: apps/content-verification-service
+            task_definition: infra/aws/ecs/task-definitions/content-verification-service.json
+            container_name: content-verification-service
+          - service: context-verification-service
+            dockerfile: apps/context-verification-service/Dockerfile
+            context: apps/context-verification-service
+            task_definition: infra/aws/ecs/task-definitions/context-verification-service.json
+            container_name: context-verification-service
+          - service: kafka-service
+            dockerfile: apps/kafka-service/Dockerfile
+            context: .
+            task_definition: infra/aws/ecs/task-definitions/kafka-service.json
+            container_name: kafka-service
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate deployment inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${{ env.AWS_REGION }}"
+          test -n "${{ env.ECS_CLUSTER }}"
+          test -n "${{ vars.AWS_ROLE_TO_ASSUME }}"
+
+      - name: Resolve service deployment settings
+        id: service-config
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${{ matrix.service }}" in
+            source-verification-service)
+              echo "ecs_service=${{ vars.ECS_SERVICE_SOURCE }}" >> "$GITHUB_OUTPUT"
+              echo "ecr_repository=${{ vars.ECR_REPOSITORY_SOURCE }}" >> "$GITHUB_OUTPUT"
+              ;;
+            content-verification-service)
+              echo "ecs_service=${{ vars.ECS_SERVICE_CONTENT }}" >> "$GITHUB_OUTPUT"
+              echo "ecr_repository=${{ vars.ECR_REPOSITORY_CONTENT }}" >> "$GITHUB_OUTPUT"
+              ;;
+            context-verification-service)
+              echo "ecs_service=${{ vars.ECS_SERVICE_CONTEXT }}" >> "$GITHUB_OUTPUT"
+              echo "ecr_repository=${{ vars.ECR_REPOSITORY_CONTEXT }}" >> "$GITHUB_OUTPUT"
+              ;;
+            kafka-service)
+              echo "ecs_service=${{ vars.ECS_SERVICE_KAFKA }}" >> "$GITHUB_OUTPUT"
+              echo "ecr_repository=${{ vars.ECR_REPOSITORY_KAFKA }}" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "Unsupported service: ${{ matrix.service }}" >&2
+              exit 1
+              ;;
+          esac
+
+          test -n "$(grep '^ecs_service=' "$GITHUB_OUTPUT" | cut -d= -f2-)"
+          test -n "$(grep '^ecr_repository=' "$GITHUB_OUTPUT" | cut -d= -f2-)"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: github-actions-trustmebro
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Extract image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.login-ecr.outputs.registry }}/${{ steps.service-config.outputs.ecr_repository }}
+          tags: |
+            type=sha,prefix=
+            type=raw,value=latest
+
+      - name: Build and push image
+        id: build-image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          provenance: false
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Render task definition
+        id: render-task-definition
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: ${{ matrix.task_definition }}
+          container-name: ${{ matrix.container_name }}
+          image: ${{ steps.login-ecr.outputs.registry }}/${{ steps.service-config.outputs.ecr_repository }}:${{ github.sha }}
+
+      - name: Deploy ECS service
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render-task-definition.outputs.task-definition }}
+          service: ${{ steps.service-config.outputs.ecs_service }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
