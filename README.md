@@ -43,28 +43,19 @@ The app currently behaves like this:
 
 ![Content Verification Process](Content%20Verification%20Process.png)
 
-`content-verification-service` works as the asynchronous verification worker in the platform:
+`content-verification-service` consumes Kafka verification jobs, runs the content pipeline, and publishes structured results back to Kafka.
 
-1. It consumes verification requests from Kafka.
-2. It runs the content verification pipeline on the incoming payload.
-3. It produces structured verification results back to Kafka.
-4. It exposes `/health` so the platform can monitor worker readiness.
+## Context Verification Process
 
-This service is designed for deeper media and content analysis after an upstream service decides a post needs more review.
+![Context Verification Process](Context%20Verification%20Process.png)
+
+`context-verification-service` serves the web app and `/api/verify`, combining Gemini, reverse image search, and linked-article extraction to detect whether a post is being used in the right context.
 
 ## Source Verification Process
 
 ![Source Verification Process](Source%20Verification%20Process.png)
 
-`source-verification-service` is the first credibility gate in the platform:
-
-1. It receives a source URL or account identifier through `/verify`.
-2. It runs the `SourceAgent`, which combines:
-   domain analysis,
-   content credibility analysis,
-   and behavioral heuristics.
-3. It returns a trust-oriented result with score, status, reasons, and detailed layer output.
-4. If the source is not confidently verified, it escalates the request to Kafka for downstream analysis.
+`source-verification-service` receives a source through `/verify`, runs the `SourceAgent`, returns a scored decision, and pushes non-verified cases to Kafka for deeper review.
 
 ## Repository Layout
 
