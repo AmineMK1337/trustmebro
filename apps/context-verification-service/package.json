@@ -1,17 +1,15 @@
 {
-  "name": "context-verification-service",
+  "name": "backend",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "dev:kafka": "tsx --env-file=.env kafka-worker.ts",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
   },
   "dependencies": {
     "@google/genai": "^1.48.0",
-    "@repo/kafka": "workspace:*",
     "next": "16.2.2",
     "react": "19.2.4",
     "react-dom": "19.2.4"
@@ -24,7 +22,6 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.2",
     "tailwindcss": "^4",
-    "tsx": "^4.20.5",
     "typescript": "^5"
   }
 }
