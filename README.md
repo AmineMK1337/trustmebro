@@ -41,7 +41,7 @@ The app currently behaves like this:
 
 ## Content Verification Process
 
-![Content Verification Process](Content%20Verification%20Process.png)
+<img width="933" height="604" alt="image" src="https://github.com/user-attachments/assets/cb09c597-a6cf-4725-960d-64082f223a54" />
 
 `content-verification-service` consumes Kafka verification jobs, runs the content pipeline, and publishes structured results back to Kafka.
 
