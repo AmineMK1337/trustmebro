@@ -3,6 +3,7 @@ packages:
   - "apps/extension-ui"
   - "apps/source-verification-service"
   - "apps/content-verification-service"
+  - "apps/context-verification-service"
   - "apps/kafka-service"
   - "packages/eslint-config"
   - "packages/kafka"
