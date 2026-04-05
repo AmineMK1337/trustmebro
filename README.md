@@ -1,5 +1,10 @@
 # TrustMeBro
 
+Team: `Binary Brains`
+
+Presentation:
+`https://canva.link/dhgvpo8umy0z5ne`
+
 TrustMeBro is a multi-service content verification platform for checking social posts across four verification layers:
 
 - source verification
@@ -8,6 +13,10 @@ TrustMeBro is a multi-service content verification platform for checking social 
 - Kafka-backed orchestration
 
 The current codebase combines Python Flask services, a Next.js app, a Node Kafka helper, and a browser extension prototype.
+
+## Application Architecture
+
+![Application Architecture](Application%20Architecture.png)
 
 ## Services
 
@@ -29,6 +38,33 @@ The app currently behaves like this:
 4. `content-verification-service` consumes Kafka messages, runs asynchronous verification, and publishes results back to Kafka.
 5. `kafka-service` ensures required Kafka topics exist and provides a simple health endpoint.
 6. `extension-ui` is a separate prototype path for scraping social content locally and sending it to a local helper backend.
+
+## Content Verification Process
+
+![Content Verification Process](Content%20Verification%20Process.png)
+
+`content-verification-service` works as the asynchronous verification worker in the platform:
+
+1. It consumes verification requests from Kafka.
+2. It runs the content verification pipeline on the incoming payload.
+3. It produces structured verification results back to Kafka.
+4. It exposes `/health` so the platform can monitor worker readiness.
+
+This service is designed for deeper media and content analysis after an upstream service decides a post needs more review.
+
+## Source Verification Process
+
+![Source Verification Process](Source%20Verification%20Process.png)
+
+`source-verification-service` is the first credibility gate in the platform:
+
+1. It receives a source URL or account identifier through `/verify`.
+2. It runs the `SourceAgent`, which combines:
+   domain analysis,
+   content credibility analysis,
+   and behavioral heuristics.
+3. It returns a trust-oriented result with score, status, reasons, and detailed layer output.
+4. If the source is not confidently verified, it escalates the request to Kafka for downstream analysis.
 
 ## Repository Layout
 
