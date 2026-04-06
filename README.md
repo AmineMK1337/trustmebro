@@ -33,11 +33,20 @@ The current codebase combines Python Flask services, a Next.js app, a Node Kafka
 The app currently behaves like this:
 
 1. `context-verification-service` exposes a web UI and `/api/verify` route for contextual consistency analysis.
-2. `source-verification-service` exposes `/verify` and `/health` for source credibility checks.
-3. `source-verification-service` can publish verification requests to Kafka when a source needs deeper review.
-4. `content-verification-service` consumes Kafka messages, runs asynchronous verification, and publishes results back to Kafka.
-5. `kafka-service` ensures required Kafka topics exist and provides a simple health endpoint.
-6. `extension-ui` is a separate prototype path for scraping social content locally and sending it to a local helper backend.
+2. `source-verification-service` can publish verification requests to Kafka when a source needs deeper review.
+3. `content-verification-service` consumes Kafka messages, runs asynchronous verification, and publishes results back to Kafka.
+4. `kafka-service` ensures required Kafka topics exist and provides a simple health endpoint.
+5. `extension-ui` is a separate prototype path for scraping social content locally and sending it to a local helper backend.
+
+## Source Verification Process
+
+![Source Verification Process](Source%20Verification%20Process.png)
+
+`source-verification-service` receives a source through `/verify`, runs the `SourceAgent`, returns a scored decision, and pushes non-verified cases to Kafka for deeper review.
+
+The Source Credibility Agent evaluates online content using three layers: *URL structure, content analysis, and source behavior*, each contributing to a final score.
+A reinforcement learning policy dynamically decides whether to use fast parallel checks or a deeper reasoning loop for complex cases.
+It outputs a credibility score, risk level, and clear explanations, while continuously improving its decisions through feedback.
 
 ## Content Verification Process
 
@@ -51,11 +60,7 @@ The app currently behaves like this:
 
 `context-verification-service` serves the web app and `/api/verify`, combining Gemini, reverse image search, and linked-article extraction to detect whether a post is being used in the right context.
 
-## Source Verification Process
 
-![Source Verification Process](Source%20Verification%20Process.png)
-
-`source-verification-service` receives a source through `/verify`, runs the `SourceAgent`, returns a scored decision, and pushes non-verified cases to Kafka for deeper review.
 
 ## Repository Layout
 
