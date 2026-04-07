@@ -3,6 +3,9 @@
 ## Overview
 This directory contains the integration of the **Vocoder Artifacts** audio deepfake detection model into DeepSafe.
 
+### Platform Architecture Note
+This model remains part of the content-verification stage. In the updated platform architecture, content verification can be triggered after adaptive source verification decisions from `source-verification-service`.
+
 **Source**: [csun22/Synthetic-Voice-Detection-Vocoder-Artifacts](https://github.com/csun22/Synthetic-Voice-Detection-Vocoder-Artifacts)
 
 **Paper**: [AI-Synthesized Voice Detection Using Neural Vocoder Artifacts (CVPR 2023)](https://openaccess.thecvf.com/content/CVPR2023W/WMF/html/Sun_AI-Synthesized_Voice_Detection_Using_Neural_Vocoder_Artifacts_CVPRW_2023_paper.html)

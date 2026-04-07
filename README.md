@@ -22,7 +22,7 @@ The current codebase combines Python Flask services, a Next.js app, a Node Kafka
 
 | Service | Runtime | Port | Role |
 |---------|---------|------|------|
-| `source-verification-service` | Python / Flask | `8080` | Public API for source credibility checks. Evaluates a source and can escalate downstream verification work to Kafka. |
+| `source-verification-service` | Python / Flask | `8080` | Adaptive source credibility service. Uses contextual-bandit + ReAct reasoning over domain/content/behavior layers, then can escalate downstream verification work to Kafka. |
 | `content-verification-service` | Python / Flask | `8082` | Private worker that consumes Kafka jobs and produces content-verification results. |
 | `context-verification-service` | Next.js | `3000` | Public web app and API for contextual consistency checks using Gemini, reverse image search, and linked-article extraction. |
 | `kafka-service` | Node / Express | `8081` | Private Kafka bootstrap and health service for required topics. |
@@ -42,11 +42,12 @@ The app currently behaves like this:
 
 ![Source Verification Process](Source%20Verification%20Process.png)
 
-`source-verification-service` receives a source through `/verify`, runs the `SourceAgent`, returns a scored decision, and pushes non-verified cases to Kafka for deeper review.
+`source-verification-service` receives a source through `/verify`, runs the adaptive source agent flow (bandit + ReAct), returns a scored decision, and pushes non-verified cases to Kafka for deeper review.
 
 The Source Credibility Agent evaluates online content using three layers: *URL structure, content analysis, and source behavior*, each contributing to a final score.
-A reinforcement learning policy dynamically decides whether to use fast parallel checks or a deeper reasoning loop for complex cases.
+A contextual bandit policy and ReAct loop dynamically choose how much analysis is needed for each case.
 It outputs a credibility score, risk level, and clear explanations, while continuously improving its decisions through feedback.
+See [apps/source-verification-service/RL.md](apps/source-verification-service/RL.md) for implementation details.
 
 ## Content Verification Process
 
@@ -172,14 +173,14 @@ The local helper runs on `http://127.0.0.1:5000`.
 
 Each deployable service now has its own Dockerfile:
 
-- [source-verification-service Dockerfile](c:/Users/user/Documents/Coding%20Projects/menacraft/apps/source-verification-service/Dockerfile)
-- [content-verification-service Dockerfile](c:/Users/user/Documents/Coding%20Projects/menacraft/apps/content-verification-service/Dockerfile)
-- [context-verification-service Dockerfile](c:/Users/user/Documents/Coding%20Projects/menacraft/apps/context-verification-service/Dockerfile)
-- [kafka-service Dockerfile](c:/Users/user/Documents/Coding%20Projects/menacraft/apps/kafka-service/Dockerfile)
+- [source-verification-service Dockerfile](apps/source-verification-service/Dockerfile)
+- [content-verification-service Dockerfile](apps/content-verification-service/Dockerfile)
+- [context-verification-service Dockerfile](apps/context-verification-service/Dockerfile)
+- [kafka-service Dockerfile](apps/kafka-service/Dockerfile)
 
 ## AWS Deployment
 
-Terraform for AWS is under [infra/aws](c:/Users/user/Documents/Coding%20Projects/menacraft/infra/aws).
+Terraform for AWS is under [infra/aws](infra/aws).
 
 At a high level, the AWS architecture is:
 
@@ -192,4 +193,4 @@ At a high level, the AWS architecture is:
 - CloudWatch log groups per service
 - GitHub Actions deploying to ECS through OIDC
 
-See [infra/aws/README.md](c:/Users/user/Documents/Coding%20Projects/menacraft/infra/aws/README.md) for provisioning and rollout details.
+See [infra/aws/README.md](infra/aws/README.md) for provisioning and rollout details.

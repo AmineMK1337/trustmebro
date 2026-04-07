@@ -39,6 +39,12 @@ graph TD
 
 Every model container exposes two endpoints: `GET /health` and `POST /predict`. The gateway reads model registrations from a single config file and handles the rest.
 
+### Platform Integration Note
+
+In the current platform architecture, `source-verification-service` performs adaptive source scoring first (contextual-bandit + ReAct policy flow). Cases requiring deeper checks are escalated through Kafka and consumed by this service for content-level verification.
+
+See [../source-verification-service/RL.md](../source-verification-service/RL.md) for source-service policy details.
+
 ---
 
 ## Quick Start

@@ -54,7 +54,7 @@ The deployed shape on AWS is:
 2. One ALB forwards traffic to `source-verification-service` in private subnets.
 3. The other ALB forwards traffic to `context-verification-service` in private subnets.
 4. All four services run on ECS Fargate in the same cluster and private subnets.
-5. `source-verification-service` performs source credibility checks and can publish deeper verification work to Kafka.
+5. `source-verification-service` performs adaptive source credibility checks (contextual-bandit + ReAct over domain/content/behavior) and can publish deeper verification work to Kafka.
 6. `content-verification-service` consumes Kafka jobs and publishes asynchronous content-analysis results.
 7. `context-verification-service` serves the contextual-consistency UI and its `/api/verify` endpoint, calling Gemini, ImgBB, SerpApi, and article extraction services.
 8. `kafka-service` ensures required Kafka topics exist and provides service-level health visibility around Kafka connectivity.
@@ -64,10 +64,10 @@ Important: this Terraform stack expects you to provide Kafka brokers through `va
 
 ## Files To Review
 
-- [main.tf](c:/Users/user/Documents/Coding%20Projects/menacraft/infra/aws/main.tf)
-- [variables.tf](c:/Users/user/Documents/Coding%20Projects/menacraft/infra/aws/variables.tf)
-- [outputs.tf](c:/Users/user/Documents/Coding%20Projects/menacraft/infra/aws/outputs.tf)
-- [deploy-aws.yml](c:/Users/user/Documents/Coding%20Projects/menacraft/.github/workflows/deploy-aws.yml)
+- [main.tf](main.tf)
+- [variables.tf](variables.tf)
+- [outputs.tf](outputs.tf)
+- [deploy-aws.yml](../../.github/workflows/deploy-aws.yml)
 
 ## Required Terraform Inputs
 
@@ -221,6 +221,12 @@ Check:
 - Runtime secrets come from Secrets Manager, not hardcoded task definitions.
 - GitHub Actions uses OIDC instead of stored AWS access keys.
 - Each ECS service gets its own task role for least privilege growth over time.
+
+## Source Verification Architecture Note
+
+The source service application logic now uses an adaptive RL-style policy path (contextual bandit + sequential reasoning loop). AWS infrastructure topology is unchanged, but expected runtime behavior for this service is now dynamic by input complexity.
+
+For implementation details, see [apps/source-verification-service/RL.md](../../apps/source-verification-service/RL.md).
 
 ## Recommended Next Step
 

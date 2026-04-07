@@ -1,6 +1,10 @@
 # 🔍 Source Credibility Agent
 
-A lightweight, modular, explainable AI system that evaluates the trustworthiness of online content using a **3-layer hybrid approach** — domain analysis, LLM-powered text evaluation (Gemini), and behavioural heuristics.
+A lightweight, modular, explainable AI system that evaluates source trustworthiness using an **adaptive architecture**:
+
+- base analyzers: domain, content (Gemini or fallback), and behavior
+- adaptive controller: contextual bandit (LinUCB) for layer selection
+- sequential reasoning: ReAct-style loop with confidence-based early stopping
 
 Built for hackathons. Zero heavy dependencies. Fully explainable.
 
@@ -9,10 +13,13 @@ Built for hackathons. Zero heavy dependencies. Fully explainable.
 ## 🏗️ Architecture
 
 ```
-source_credibility_agent/
+source-verification-service/
 │
 ├── agent/
-│   └── source_agent.py        ← Main SourceAgent class (orchestrator)
+│   ├── source_agent.py        ← Static + bandit-enabled orchestrator
+│   ├── react_agent.py         ← Adaptive ReAct loop (sequential reasoning)
+│   ├── bandit_policy.py       ← LinUCB contextual bandit policy
+│   └── reward.py              ← Reward function (accuracy vs. cost)
 │
 ├── tools/
 │   ├── domain_analyzer.py     ← Layer 1: URL / domain structural analysis
@@ -28,6 +35,9 @@ source_credibility_agent/
 ├── examples/
 │   └── run_examples.py        ← 5 demo scenarios (High / Medium / Low risk)
 │
+├── app.py                      ← Kafka consumer worker entrypoint
+├── pipeline.py                 ← Service verification pipeline
+├── RL.md                       ← Detailed RL design doc
 ├── requirements.txt
 └── README.md
 ```
@@ -69,13 +79,13 @@ python examples/run_examples.py
 ## 💻 Code Usage
 
 ```python
-from agent.source_agent import SourceAgent
+from agent.react_agent import AdaptiveAgent
 
 # Initialise (picks up GEMINI_API_KEY from env)
-agent = SourceAgent(api_key="YOUR_KEY")  # or set env var
+agent = AdaptiveAgent(api_key="YOUR_KEY", learn=True)
 
-# Full 3-layer evaluation
-result = agent.run(
+# Adaptive evaluation
+result = agent.evaluate(
     url="http://real-official-truth-news-alert.xyz/breaking",
     text="SHOCKING: They don't want you to know this SECRET!!",
     metadata={
@@ -91,6 +101,7 @@ result = agent.run(
 print(result["score"])   # e.g. 82
 print(result["risk"])    # "High"
 print(result["reasons"]) # list of explanations
+print(result["bandit_action"]["label"])  # selected layer strategy
 ```
 
 ### Output Schema
@@ -205,6 +216,24 @@ Get yours free at: https://aistudio.google.com/app/apikey
 
 The agent uses `gemini-2.0-flash` via direct HTTP (no SDK needed).
 Without a key, a fully offline rule-based fallback is used automatically.
+
+---
+
+## 🧠 Reinforcement Learning (Adaptive Mode)
+
+This service also includes an adaptive RL-driven decision path based on a contextual bandit:
+
+- Policy: LinUCB contextual bandit for layer selection.
+- Runtime loop: ReAct-style sequential execution with early stopping.
+- Learning signal: reward that balances prediction accuracy vs latency/API cost.
+
+See [RL.md](RL.md) for the full explanation of:
+
+- state features
+- action space
+- reward formulation
+- online policy update loop
+- PPO-compatible upgrade path
 
 ---
 
